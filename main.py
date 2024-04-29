@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torch.utils import tensorboard
 from torch.utils.data import TensorDataset
+from model.VGG16 import VGG16
 
 labels = [i + 1 for i in range(30)]
 utils.fix_seed(42)
@@ -28,7 +29,7 @@ config = argparse.ArgumentParser()
 config.add_argument("--batch_size", default=256, type=int)
 config.add_argument("--num_workers", default=4, type=int)
 config.add_argument("--lr", default=0.00005, type=float)
-config.add_argument("--gpus", default="0", type=str)  # GPU 인덱스 문자열로 입력받음
+config.add_argument("--gpus", default="0", type=str)
 config.add_argument("--epoch", default=200, type=int)
 config.add_argument("--patience", default=20, type=int)
 config.add_argument("--train_samples", default=8000, type=int)
