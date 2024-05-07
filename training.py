@@ -118,9 +118,7 @@ class Trainer:
             "precision": avg_precision,
             "recall": avg_recall,
             "f1": avg_f1,
-        }
-
-    def eval(self, epoch, val_dataset):
+         def eval(self, epoch, val_dataset):
         self.model.eval()
         val_loader = DataLoader(val_dataset, batch_size=self.config.batch_size)
         data_iter = tqdm(val_loader, desc=f"EP:{epoch}_valid", total=len(val_loader))

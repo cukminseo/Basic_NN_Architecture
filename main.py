@@ -100,6 +100,7 @@ for i, (train_index, test_index) in enumerate(sss.split(x, y)):
 
     # 모델 생성 및 DataParallel 설정
     model = timm.create_model(config.model, num_classes=config.num_classes, pretrained=True)
+
     if torch.cuda.is_available() and len(device_ids) > 1:
         model = nn.DataParallel(model, device_ids=device_ids).to(device)
     else:
