@@ -41,7 +41,6 @@ class Trainer:
             task="multiclass", num_classes=self.config.num_classes
         ).to(device)
 
-
     def train(self, epoch, train_dataset: Dataset):
         self.model.train()
         train_loader = DataLoader(train_dataset, batch_size=self.config.batch_size, shuffle=True)
@@ -61,7 +60,7 @@ class Trainer:
                 primary_device = self.device
 
             # 딕셔너리 처리
-            #batch = {k: v.to(primary_device) for k, v in batch.items()}
+            # batch = {k: v.to(primary_device) for k, v in batch.items()}
             # 튜플 처리
             inputs, labels = batch
             inputs, labels = inputs.to(primary_device), labels.to(primary_device)
@@ -117,8 +116,9 @@ class Trainer:
             "acc": avg_acc,
             "precision": avg_precision,
             "recall": avg_recall,
-            "f1": avg_f1,
-         def eval(self, epoch, val_dataset):
+            "f1": avg_f1, }
+
+    def eval(self, epoch, val_dataset):
         self.model.eval()
         val_loader = DataLoader(val_dataset, batch_size=self.config.batch_size)
         data_iter = tqdm(val_loader, desc=f"EP:{epoch}_valid", total=len(val_loader))
@@ -138,7 +138,7 @@ class Trainer:
                 primary_device = self.device
 
             # 딕셔너리 처리
-            #batch = {k: v.to(primary_device) for k, v in batch.items()}
+            # batch = {k: v.to(primary_device) for k, v in batch.items()}
             # 튜플 처리
             inputs, labels = batch
             inputs, labels = inputs.to(primary_device), labels.to(primary_device)
@@ -156,8 +156,6 @@ class Trainer:
 
                 loss = self.criterion(output, batch_labels.long())
                 preds = torch.argmax(output, dim=1)
-
-
 
             loss = self.criterion(output, batch_labels.long())
 

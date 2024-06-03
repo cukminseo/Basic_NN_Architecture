@@ -1,2 +1,10 @@
 /.idea
 /lecture/MNIST_data
+/application_blood/data
+/application_blood/output
+/application_blood/
+/application_water(cross-fold)/model/__pycache__/
+/application_water(cross-fold)/confusion_matrix
+/application_water(cross-fold)/logs
+/application_water(cross-fold)/data
+/application_water(cross-fold)/output
