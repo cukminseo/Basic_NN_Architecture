@@ -7,12 +7,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 import matplotlib.pyplot as plt
-
+from torch.utils.tensorboard import SummaryWriter
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 # Check if GPU is available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Using device: {device}')
 
+
+# TensorBoard writer setup
+log_dir = 'logs/cnn_adam/' + datetime.now().strftime("%Y%m%d-%H%M%S")
+writer = SummaryWriter(log_dir)
 
 """
 https://pytorch.org/vision/main/generated/torchvision.datasets.MNIST.html
@@ -71,7 +76,7 @@ label = train_labels[0]
 # Since it's a colorless bitmap, we retrieve it in gray.
 plt.imshow(img, cmap= "gray")
 # show plt
-plt.show()
+# plt.show()
 # Print the label of the above data
 print (f"Label: {label}")
 class MyCNNModel(nn.Module):
@@ -104,47 +109,16 @@ class MyCNNModel(nn.Module):
         return logits
 
 
-# Model definition
-class MyDeepLearningModel(nn.Module):
-    # init method
-    def __init__(self):
-        super().__init__()
-        # Function to flatten the input before feeding it into the MLP
-        self.flatten = nn.Flatten()
-        # MLP with 784 inputs and 256 outputs
-        self.fc1 = nn.Linear(784, 256)
-        # Using ReLU as the activation function
-        self.relu = nn.ReLU()
-        # Using dropout to prevent overfitting (with a ratio of 0.3)
-        self.dropout = nn.Dropout(p=0.3)
-        # Function with 256 inputs and 10 outputs
-        # Since there are 10 classes for the final classification, the output is set to 10
-        self.fc2 = nn.Linear(256, 10)
-
-    # Using the functions declared above
-    def forward(self, x):
-        # flatten layer
-        x = self.flatten(x)
-        # fully connected layer1
-        x = self.fc1(x)
-        # activation function
-        x = self.relu(x)
-        # set dropout
-        x = self.dropout(x)
-        # fully connected layer2
-        logits = self.fc2(x)
-        return logits
-
 # Model declaration
-model = MyDeepLearningModel().to(device)
+model = MyCNNModel().to(device)
 
 # Using CrossEntropyLoss. It also includes softmax function
 loss_function = nn.CrossEntropyLoss()
 # Using SGD as the optimizer, and setting the learning rate as a hyperparameter
 # optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
-optimizer = torch.optim.Adam(model.parameters(), lr = 1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 # Define the training function
-def model_train(dataloader, model, loss_function, optimizer):
+def model_train(dataloader, model, loss_function, optimizer, epoch):
     # Call the train method of the nn.Module superclass
     model.train()
     # Variable to accumulate the total loss
@@ -155,13 +129,15 @@ def model_train(dataloader, model, loss_function, optimizer):
     train_total = 0
     # Save the total number of batches
     total_train_batch = len(dataloader)
+    all_labels = []
+    all_preds = []
 
     # Iterate over each batch
-    for images, labels in dataloader:
+    for batch_idx, (images, labels) in enumerate(dataloader):
         # Transfer images and labels to the GPU
         images, labels = images.to(device), labels.to(device)
         # Reshape images from (batch_size, 1, 28, 28) to (batch_size, 784)
-        x_train = images.view(-1, 28 * 28)
+        x_train = images
         # Assign labels to y_train
         y_train = labels
         # Input the data into the model and save the output
@@ -183,16 +159,31 @@ def model_train(dataloader, model, loss_function, optimizer):
         # Accumulate the count of correct predictions
         train_correct += (torch.argmax(outputs, 1) == y_train).sum().item()
 
+        all_labels.extend(y_train.cpu().numpy())
+        all_preds.extend(torch.argmax(outputs, 1).cpu().numpy())
+
+
     # Compute the average loss
     train_avg_loss = train_loss_sum / total_train_batch
     # Compute the average accuracy
     train_avg_accuracy = 100 * train_correct / train_total
 
+    precision = precision_score(all_labels, all_preds, average='macro')
+    recall = recall_score(all_labels, all_preds, average='macro')
+    f1 = f1_score(all_labels, all_preds, average='macro')
+
+    # Log epoch statistics
+    writer.add_scalar('Loss/train_epoch', train_avg_loss, epoch)
+    writer.add_scalar('Accuracy/train_epoch', train_avg_accuracy, epoch)
+    writer.add_scalar('Precision/train_epoch', precision, epoch)
+    writer.add_scalar('Recall/train_epoch', recall, epoch)
+    writer.add_scalar('F1_Score/train_epoch', f1, epoch)
+
     # Return the average loss and accuracy
-    return train_avg_loss, train_avg_accuracy
+    return train_avg_loss, train_avg_accuracy, precision, recall, f1
 
 # Define the evaluation function
-def model_evaluate(dataloader, model, loss_function):
+def model_evaluate(dataloader, model, loss_function, epoch):
     # Set the model to evaluation mode (disable dropout, batch normalization, etc.)
     model.eval()
     # Do not compute gradients during evaluation
@@ -205,13 +196,15 @@ def model_evaluate(dataloader, model, loss_function):
         val_total = 0
         # Save the total number of batches
         total_val_batch = len(dataloader)
+        all_labels = []
+        all_preds = []
 
         # Iterate over each batch
         for images, labels in dataloader:
             # Transfer images and labels to the GPU
             images, labels = images.to(device), labels.to(device)
             # Reshape images from (batch_size, 1, 28, 28) to (batch_size, 784)
-            x_val = images.view(-1, 28 * 28)
+            x_val = images
             # Assign labels to y_val
             y_val = labels
             # Input the data into the model and save the output
@@ -225,13 +218,26 @@ def model_evaluate(dataloader, model, loss_function):
             # Accumulate the count of correct predictions
             val_correct += (torch.argmax(outputs, 1) == y_val).sum().item()
 
+            all_labels.extend(y_val.cpu().numpy())
+            all_preds.extend(torch.argmax(outputs, 1).cpu().numpy())
+
         # Compute the average loss
         val_avg_loss = val_loss_sum / total_val_batch
         # Compute the average accuracy
         val_avg_accuracy = 100 * val_correct / val_total
 
-        # Return the average loss and accuracy
-        return val_avg_loss, val_avg_accuracy
+        precision = precision_score(all_labels, all_preds, average='macro')
+        recall = recall_score(all_labels, all_preds, average='macro')
+        f1 = f1_score(all_labels, all_preds, average='macro')
+
+        # Log epoch statistics
+        writer.add_scalar('Loss/validation_epoch', val_avg_loss, epoch)
+        writer.add_scalar('Accuracy/validation_epoch', val_avg_accuracy, epoch)
+        writer.add_scalar('Precision/validation_epoch', precision, epoch)
+        writer.add_scalar('Recall/validation_epoch', recall, epoch)
+        writer.add_scalar('F1_Score/validation_epoch', f1, epoch)
+
+        return val_avg_loss, val_avg_accuracy, precision, recall, f1
 
 # Define the test function
 def model_test(dataloader, model, loss_function):
@@ -253,7 +259,7 @@ def model_test(dataloader, model, loss_function):
             # Transfer images and labels to the GPU
             images, labels = images.to(device), labels.to(device)
             # Reshape images from (batch_size, 1, 28, 28) to (batch_size, 784)
-            x_test = images.view(-1, 28 * 28)
+            x_test = images
             # Assign labels to y_test
             y_test = labels
             # Input the data into the model and save the output
@@ -277,12 +283,20 @@ def model_test(dataloader, model, loss_function):
         # Print the loss
         print('Loss:', test_avg_loss)
 
+
 # Lists to save training loss and accuracy
 train_loss_list = []
 train_accuracy_list = []
+train_precision_list = []
+train_recall_list = []
+train_f1_list = []
+
 # Lists to save validation loss and accuracy
 val_loss_list = []
 val_accuracy_list = []
+val_precision_list = []
+val_recall_list = []
+val_f1_list = []
 
 # Record the start time of training
 start_time = datetime.now()
@@ -293,49 +307,49 @@ EPOCHS = 100
 # Iterate over each epoch
 for epoch in range(EPOCHS):
     # ------------ model train --------------
-    # Train the model and return average loss and accuracy
-    train_avg_loss, train_avg_accuracy = model_train(train_dataset_loader, model, loss_function, optimizer)
-    # Append the training loss to the list
+    train_avg_loss, train_avg_accuracy, train_precision, train_recall, train_f1 = model_train(train_dataset_loader, model, loss_function, optimizer, epoch)
     train_loss_list.append(train_avg_loss)
-    # Append the training accuracy to the list
     train_accuracy_list.append(train_avg_accuracy)
+    train_precision_list.append(train_precision)
+    train_recall_list.append(train_recall)
+    train_f1_list.append(train_f1)
 
     # =========== model evaluation --------------
-    # Validate the model and return average loss and accuracy
-    val_avg_loss, val_avg_accuracy = model_evaluate(validation_dataset_loader, model, loss_function)
-    # Append the validation loss to the list
+    val_avg_loss, val_avg_accuracy, val_precision, val_recall, val_f1 = model_evaluate(validation_dataset_loader, model, loss_function, epoch)
     val_loss_list.append(val_avg_loss)
-    # Append the validation accuracy to the list
     val_accuracy_list.append(val_avg_accuracy)
+    val_precision_list.append(val_precision)
+    val_recall_list.append(val_recall)
+    val_f1_list.append(val_f1)
 
     # Print the results for each epoch
     print('epoch:', '%02d' % (epoch + 1),
           'train loss=', '{:.4f}'.format(train_avg_loss), 'train accuracy=', '{:.4f}'.format(train_avg_accuracy),
           'validation loss=', '{:.4f}'.format(val_avg_loss), 'validation accuracy=', '{:.4f}'.format(val_avg_accuracy))
-
-plt.title('Loss Trend')
-plt.xlabel('epochs')
-plt.ylabel('loss')
-plt.grid()
-
-plt.plot(train_loss_list, label='train loss')
-plt.plot(val_loss_list, label='validation loss')
-
-plt.legend()
-
-plt.show()
-
-plt.title('Accuracy Trend')
-plt.xlabel('epochs')
-plt.ylabel('accuracy')
-plt.grid()
-
-plt.plot(train_accuracy_list, label='train accuracy')
-plt.plot(val_accuracy_list, label='validation accuracy')
-
-plt.legend()
-
-plt.show()
+#
+# plt.title('Loss Trend(CNN)')
+# plt.xlabel('epochs')
+# plt.ylabel('loss')
+# plt.grid()
+#
+# plt.plot(train_loss_list, label='train loss')
+# plt.plot(val_loss_list, label='validation loss')
+#
+# plt.legend()
+#
+# plt.show()
+#
+# plt.title('Accuracy Trend(CNN)')
+# plt.xlabel('epochs')
+# plt.ylabel('accuracy')
+# plt.grid()
+#
+# plt.plot(train_accuracy_list, label='train accuracy')
+# plt.plot(val_accuracy_list, label='validation accuracy')
+#
+# plt.legend()
+#
+# plt.show()
 
 
 # Record the end time of training
@@ -343,3 +357,5 @@ end_time = datetime.now()
 
 # Print the elapsed time
 print('elapsed time=', end_time - start_time)
+# Close the TensorBoard writer
+writer.close()
