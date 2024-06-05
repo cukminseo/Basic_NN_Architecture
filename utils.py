@@ -14,43 +14,18 @@ import pandas as pd
 from PIL import Image
 
 
-def resize_images(images, new_size=(224, 224)):
-    resized_images = []
-    for image in images:
-        # 이미지가 토치 텐서인 경우, 넘파이 배열로 변환
-        if isinstance(image, torch.Tensor):
-            image = image.cpu().numpy()
+def load_and_pad_image(file_path, target_size=(224, 224)):
+    image = Image.open(file_path).convert('L')  # 이미지를 그레이스케일로 변환
+    old_size = image.size  # 원래 이미지 크기
+    ratio = min(target_size[0] / old_size[0], target_size[1] / old_size[1])
+    new_size = tuple([int(x * ratio) for x in old_size])
+    image = image.resize(new_size, Image.LANCZOS)
 
-        # 데이터 타입이 np.float32 또는 다른 형태인 경우, np.uint8로 변환
-        if image.dtype != np.uint8:
-            # 최대/최소 정규화 후 255를 곱하여 uint8로 변환
-            image = ((image - image.min()) / (image.max() - image.min()) * 255).astype(np.uint8)
-
-        # 이미지 데이터가 (1, 높이, 너비) 형태인 경우, (높이, 너비)로 변환
-        if image.shape[0] == 1:
-            image = image.squeeze(0)
-
-        # Numpy 배열을 PIL 이미지로 변환
-        image_pil = Image.fromarray(image)
-
-        # 이미지 리사이징
-        image_resized = image_pil.resize(new_size, Image.BILINEAR)
-
-        # 리사이징된 이미지를 다시 Numpy 배열로 변환
-        image_resized_np = np.array(image_resized)
-
-        # 그레이스케일 이미지를 RGB로 변환
-        if len(image_resized_np.shape) == 2 or image_resized_np.shape[0] == 1:
-            image_resized_np = np.stack((image_resized_np,) * 3, axis=-1)
-
-        # (높이, 너비, 채널 수)에서 (채널 수, 높이, 너비)로 차원 순서 변경
-        image_resized_np = np.transpose(image_resized_np, (2, 0, 1))
-
-        # 리스트에 추가
-        resized_images.append(image_resized_np)
-
-    # 리스트를 Numpy 배열로 변환하여 반환
-    return np.stack(resized_images)
+    # 새로운 이미지 생성 및 패딩
+    new_image = Image.new("L", target_size)
+    new_image.paste(image, ((target_size[0] - new_size[0]) // 2,
+                            (target_size[1] - new_size[1]) // 2))
+    return np.array(new_image)
 
 
 def fix_seed(seed):
@@ -87,62 +62,49 @@ def get_data_list(data_path):
     :param data_path: 데이터 파일들이 위치한 디렉토리의 경로입니다.
     :return: 데이터 파일 이름, 데이터 파일 경로, 데이터 파일 레이블로 구성된 리스트를 반환합니다.
     '''
-    data_name_list = []
     y = []
-    data_path_list = []
-    clss = sorted(os.listdir(data_path), key=sort_key)  # 숫자 오름차순으로 정렬
-    for cls in clss:
-        print(f"class {clss.index(cls)} : {cls}")
-        labels = os.listdir(f"{data_path}/{cls}")
-        for label in labels:
-            for data_name in os.listdir(f"{data_path}/{cls}/{label}"):
-                if data_name == "Unnamed":
-                    continue
-                data_name_list.append(data_name)
-                data_path_list.append(f"{data_path}/{cls}/{label}/{data_name}")
-                # 여기서 cls 문자열에서 숫자 부분만 추출하여 y에 저장합니다.
-                match = re.match(r"(\d+)_output", cls)
-                cls_number = int(match.group(1)) if match else 0
-                # y에 실제 값 대입
-                # y.append(cls_number)
-                # y에 순서 값 대입
-                y.append(clss.index(cls))
-    print(f"find {len(data_name_list)} files")
-    return [data_name_list, data_path_list, y]
+    file_path_list = []
+    class_list = sorted(os.listdir(data_path), key=sort_key)  # 숫자 오름차순으로 정렬
+    for label, _class in enumerate(class_list):
+        print(f"class {label} : {_class}", end=" ")
+        class_path = os.path.join(data_path,_class)
+        file_list = os.listdir(class_path)
+        for file_name in file_list:
+            file_path = os.path.join(data_path, _class, file_name)
+
+            file_path_list.append(file_path)
+            y.append(label)
+        print(f"(find {len(file_list)} files)")
+    print(f"In all class, find {len(file_path_list)} files")
+    return [file_path_list, y]
+
+
+def get_image_size_statistics(file_path_list):
+    max_size = (0, 0)
+    min_size = (float('inf'), float('inf'))
+    max_width = 0
+    max_height = 0
+
+    for file_path in file_path_list:
+        with Image.open(file_path) as img:
+            width, height = img.size
+            max_size = max(max_size, (width, height), key=lambda x: x[0] * x[1])
+            min_size = min(min_size, (width, height), key=lambda x: x[0] * x[1])
+            max_width = max(max_width, width)
+            max_height = max(max_height, height)
+
+    print(f"Max Image Size: {max_size}")
+    print(f"Min Image Size: {min_size}")
+    print(f"Max Width: {max_width}")
+    print(f"Max Height: {max_height}")
+    return (max_width, max_height)
 
 
 def plot_confusion_matrix(cf_matrix):
     classes = [
-        "0_output",
-        "50_output",
-        "60_output",
-        "70_output",
-        "75_output",
-        "80_output",
-        "85_output",
-        "90_output",
-        "95_output",
-        "100_output",
-        "105_output",
-        "110_output",
-        "115_output",
-        "120_output",
-        "125_output",
-        "130_output",
-        "135_output",
-        "140_output",
-        "145_output",
-        "150_output",
-        "160_output",
-        "170_output",
-        "180_output",
-        "190_output",
-        "200_output",
-        "210_output",
-        "220_output",
-        "230_output",
-        "240_output",
-        "250_output",
+        "benign",
+        "malignant",
+        "normal",
     ]
 
     dpi_val = 68.84

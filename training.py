@@ -10,6 +10,7 @@ from torchmetrics.classification import (
     Accuracy,
     F1Score,
 )
+import numpy as np
 
 
 class Trainer:
@@ -59,31 +60,20 @@ class Trainer:
             else:
                 primary_device = self.device
 
-            # 딕셔너리 처리
-            # batch = {k: v.to(primary_device) for k, v in batch.items()}
             # 튜플 처리
             inputs, labels = batch
             inputs, labels = inputs.to(primary_device), labels.to(primary_device)
 
             self.optim.zero_grad()
-            # 기존 코드 (잘못된 접근)
-            # batch_inputs = batch_inputs.unsqueeze(1)
 
-            # 변경 후
-            inputs, labels = batch
-            batch_inputs = inputs.to(primary_device)
-            batch_labels = labels.to(primary_device)
-            # batch_inputs = inputs.unsqueeze(1)  # 필요한 경우
-
-            output = self.model(batch_inputs)
-
-            loss = self.criterion(output, batch_labels.long())
+            output = self.model(inputs)
+            loss = self.criterion(output, labels.long())
             preds = torch.argmax(output, dim=1)
 
-            acc = self.acc(preds, batch_labels)
-            recall = self.recall(preds, batch_labels)
-            precision = self.precision(preds, batch_labels)
-            f1 = self.f1(preds, batch_labels)
+            acc = self.acc(preds, labels)
+            recall = self.recall(preds, labels)
+            precision = self.precision(preds, labels)
+            f1 = self.f1(preds, labels)
 
             avg_loss.append(loss.item())
             avg_acc.append(acc.item())
@@ -116,7 +106,8 @@ class Trainer:
             "acc": avg_acc,
             "precision": avg_precision,
             "recall": avg_recall,
-            "f1": avg_f1, }
+            "f1": avg_f1,
+        }
 
     def eval(self, epoch, val_dataset):
         self.model.eval()
@@ -137,32 +128,19 @@ class Trainer:
             else:
                 primary_device = self.device
 
-            # 딕셔너리 처리
-            # batch = {k: v.to(primary_device) for k, v in batch.items()}
             # 튜플 처리
             inputs, labels = batch
             inputs, labels = inputs.to(primary_device), labels.to(primary_device)
 
             with torch.no_grad():
-                # 기존 코드 (잘못된 접근)
-                # batch_inputs = batch_inputs.unsqueeze(1)
-
-                # 변경 후
-                inputs, labels = batch
-                batch_inputs = inputs.to(primary_device)
-                batch_labels = labels.to(primary_device)
-                # batch_inputs = inputs.unsqueeze(1)  # 필요한 경우
-                output = self.model(batch_inputs)
-
-                loss = self.criterion(output, batch_labels.long())
+                output = self.model(inputs)
+                loss = self.criterion(output, labels.long())
                 preds = torch.argmax(output, dim=1)
 
-            loss = self.criterion(output, batch_labels.long())
-
-            acc = self.acc(output, batch_labels)
-            recall = self.recall(output, batch_labels)
-            precision = self.precision(output, batch_labels)
-            f1 = self.f1(output, batch_labels)
+            acc = self.acc(preds, labels)
+            recall = self.recall(preds, labels)
+            precision = self.precision(preds, labels)
+            f1 = self.f1(preds, labels)
 
             avg_loss.append(loss.item())
             avg_acc.append(acc.item())
@@ -171,9 +149,9 @@ class Trainer:
             avg_f1.append(f1.item())
 
             if c_mat is None:
-                c_mat = self.c_mat(output, batch_labels)
+                c_mat = self.c_mat(preds, labels)
             else:
-                c_mat += self.c_mat(output, batch_labels)
+                c_mat += self.c_mat(preds, labels)
 
         # 에포크별 평균 성능 지표 계산
         avg_loss = np.mean(avg_loss)
@@ -189,7 +167,3 @@ class Trainer:
             "recall": avg_recall,
             "f1": avg_f1,
         }, c_mat
-
-
-if __name__ == "__main__":
-    print(torch.cuda.is_available())
