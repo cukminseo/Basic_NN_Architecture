@@ -55,20 +55,23 @@ class Trainer:
         avg_f1 = []
 
         for idx, batch in enumerate(data_iter):
-            if isinstance(self.model, nn.DataParallel):
-                primary_device = f"cuda:{self.model.device_ids[0]}"
-            else:
-                primary_device = self.device
-
             # 튜플 처리
             inputs, labels = batch
-            inputs, labels = inputs.to(primary_device), labels.to(primary_device)
+
+            # 데이터 타입 확인 및 변환
+            if not isinstance(inputs, torch.Tensor):
+                inputs = torch.tensor(inputs)
+            if not isinstance(labels, torch.Tensor):
+                labels = torch.tensor(labels)
+
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             self.optim.zero_grad()
 
             output = self.model(inputs)
             loss = self.criterion(output, labels.long())
             preds = torch.argmax(output, dim=1)
+            preds = preds.to(self.device)
 
             acc = self.acc(preds, labels)
             recall = self.recall(preds, labels)
@@ -85,14 +88,12 @@ class Trainer:
             self.optim.step()
 
             post_fix = {
-                "loss": loss.item(),
                 "acc": acc.item(),
-                "precision": precision.item(),
-                "recall": recall.item(),
-                "f1-score": f1.item(),
+                "loss": loss.item(),
             }
 
             data_iter.set_postfix(post_fix)
+            torch.cuda.empty_cache()  # GPU 메모리 해제
 
         # 에포크별 평균 성능 지표 계산
         avg_loss = np.mean(avg_loss)
@@ -112,7 +113,7 @@ class Trainer:
     def eval(self, epoch, val_dataset):
         self.model.eval()
         val_loader = DataLoader(val_dataset, batch_size=self.config.batch_size)
-        data_iter = tqdm(val_loader, desc=f"EP:{epoch}_valid", total=len(val_loader))
+        data_iter = tqdm(val_loader, desc=f"EP:{epoch}_valid", total=len(val_loader), bar_format="{l_bar}{r_bar}")
 
         # 에포크별 평균 성능 지표 계산
         avg_loss = []
@@ -123,19 +124,22 @@ class Trainer:
 
         c_mat = None
         for idx, batch in enumerate(data_iter):
-            if isinstance(self.model, nn.DataParallel):
-                primary_device = f"cuda:{self.model.device_ids[0]}"
-            else:
-                primary_device = self.device
-
             # 튜플 처리
             inputs, labels = batch
-            inputs, labels = inputs.to(primary_device), labels.to(primary_device)
+
+            # 데이터 타입 확인 및 변환
+            if not isinstance(inputs, torch.Tensor):
+                inputs = torch.tensor(inputs)
+            if not isinstance(labels, torch.Tensor):
+                labels = torch.tensor(labels)
+
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             with torch.no_grad():
                 output = self.model(inputs)
                 loss = self.criterion(output, labels.long())
                 preds = torch.argmax(output, dim=1)
+                preds = preds.to(self.device)
 
             acc = self.acc(preds, labels)
             recall = self.recall(preds, labels)
@@ -152,6 +156,14 @@ class Trainer:
                 c_mat = self.c_mat(preds, labels)
             else:
                 c_mat += self.c_mat(preds, labels)
+
+        # Add this line to update the progress bar for validation
+        post_fix = {
+            "acc": acc.item(),
+            "loss": loss.item(),
+        }
+        data_iter.set_postfix(post_fix)
+        torch.cuda.empty_cache()  # GPU 메모리 해제
 
         # 에포크별 평균 성능 지표 계산
         avg_loss = np.mean(avg_loss)

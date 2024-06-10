@@ -11,4 +11,9 @@
 /output
 /confusion_matrix
 /logs
-/application/Breast-Ultrasound-Images-classification/Dataset_BUSI_with_GT
+/working
+/Dataset_BUSI_with_GT
+/.SynologyWorkingDirectory
+/previous
+/desktop.ini
+__pycache__/
