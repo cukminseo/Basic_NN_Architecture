@@ -24,7 +24,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"  # GPU 사용 가능 여
 
 # argparse
 config = argparse.ArgumentParser()
-config.add_argument("--batch_size", default=16, type=int)
+config.add_argument("--batch_size", default=4, type=int)
 config.add_argument("--lr", default=0.0005, type=float)
 config.add_argument("--gpus", default="0", type=str)
 config.add_argument("--epoch", default=200, type=int)
@@ -58,11 +58,11 @@ for fold in range(k_fold):
     minority_classes = ['malignant', 'normal']
 
     # Define custom data transformations for minority classes
-    minority_class_transforms = transforms.Compose([
-        RandomHorizontalFlip(p=0.9),  # Apply with 90% probability
-        RandomRotation(15, expand=False, center=None),
-        ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-    ])
+    # minority_class_transforms = transforms.Compose([
+    #     RandomHorizontalFlip(p=0.9),  # Apply with 90% probability
+    #     RandomRotation(15, expand=False, center=None),
+    #     ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+    # ])
 
     # Define data transformations for train, validation, and test sets
     data_transforms = {
@@ -70,14 +70,13 @@ for fold in range(k_fold):
             transforms.Resize((300, 300)),
             transforms.Grayscale(num_output_channels=1),
             RandomHorizontalFlip(p=0.5),
-            RandomRotation(30, expand=False, center=None),
+            RandomRotation(180, expand=False, center=None),
             transforms.ToTensor(),
             transforms.Normalize([83.63/255], [9.16/255])
         ]),
         'validation': transforms.Compose([
             transforms.Resize((300, 300)),
             transforms.Grayscale(num_output_channels=1),
-            # transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize([83.63/255], [9.16/255])
         ])
