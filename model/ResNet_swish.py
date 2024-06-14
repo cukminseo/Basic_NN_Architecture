@@ -1,6 +1,11 @@
 import torch
 import torch.nn as nn
 
+
+class Swish(nn.Module):
+    def forward(self, x):
+        return x * torch.sigmoid(x)
+
 class Bottleneck(nn.Module):
     expansion = 4
 
@@ -13,19 +18,20 @@ class Bottleneck(nn.Module):
         self.bn2 = nn.BatchNorm2d(out_channels)
         self.conv3 = nn.Conv2d(out_channels, out_channels * self.expansion, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(out_channels * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
+
+        self.swish = Swish()
 
     def forward(self, x):
         identity = x
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.swish(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
-        out = self.relu(out)
+        out = self.swish(out)
 
         out = self.conv3(out)
         out = self.bn3(out)
@@ -34,9 +40,10 @@ class Bottleneck(nn.Module):
             identity = self.downsample(x)
 
         out += identity
-        out = self.relu(out)
+        out = self.swish(out)
 
         return out
+
 
 class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes=3):
@@ -44,7 +51,6 @@ class ResNet(nn.Module):
         self.in_channels = 64
         self.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
-        self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
@@ -52,6 +58,8 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
+
+        self.swish = Swish()
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -80,7 +88,7 @@ class ResNet(nn.Module):
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)
+        x = self.swish(x)
         x = self.maxpool(x)
 
         x = self.layer1(x)
