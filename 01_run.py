@@ -5,12 +5,12 @@ from torchvision.datasets import ImageFolder
 from torch.utils.data import Dataset, DataLoader
 import os
 import matplotlib.pyplot as plt
-from torchvision.transforms import RandomHorizontalFlip, RandomRotation, ColorJitter
+from torchvision.transforms import RandomHorizontalFlip, RandomRotation
 from torch.utils import tensorboard
 
 import util
 import training
-from model.ResNet import ResNet, Bottleneck
+from model.ResNet_relu import ResNet, Bottleneck
 import gc
 
 DEBUG = True
@@ -25,7 +25,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"  # GPU 사용 가능 여
 # argparse
 config = argparse.ArgumentParser()
 config.add_argument("--batch_size", default=4, type=int)
-config.add_argument("--lr", default=0.0005, type=float)
+config.add_argument("--lr", default=0.005, type=float)
 config.add_argument("--gpus", default="0", type=str)
 config.add_argument("--epoch", default=200, type=int)
 config.add_argument("--earlystop_patience", default=10, type=int)
@@ -57,20 +57,13 @@ for fold in range(k_fold):
     class_names = ['malignant', 'normal', 'benign']
     minority_classes = ['malignant', 'normal']
 
-    # Define custom data transformations for minority classes
-    # minority_class_transforms = transforms.Compose([
-    #     RandomHorizontalFlip(p=0.9),  # Apply with 90% probability
-    #     RandomRotation(15, expand=False, center=None),
-    #     ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-    # ])
-
     # Define data transformations for train, validation, and test sets
     data_transforms = {
         'train': transforms.Compose([
             transforms.Resize((300, 300)),
             transforms.Grayscale(num_output_channels=1),
             RandomHorizontalFlip(p=0.5),
-            RandomRotation(180, expand=False, center=None),
+            RandomRotation(30, expand=False, center=None),
             transforms.ToTensor(),
             transforms.Normalize([83.63/255], [9.16/255])
         ]),
@@ -123,7 +116,7 @@ for fold in range(k_fold):
     checkpoint_score = 0
 
     # tensorboard 로그 기록
-    writer = tensorboard.SummaryWriter(f"./logs/{config.model}_fold{fold + 1}_batch{config.batch_size}_lr{config.lr}")
+    writer = tensorboard.SummaryWriter(f"./logs/{config.model}_fold{fold + 1}_batch{config.batch_size}_lr{config.lr}(relu,micro)")
 
     # 에포크별 학습 진행
     for epoch in range(config.epoch):

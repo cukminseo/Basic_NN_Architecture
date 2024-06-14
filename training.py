@@ -1,4 +1,5 @@
 import torch
+import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from torch.optim import Adam
@@ -24,18 +25,19 @@ class Trainer:
 
         # 손실함수로 adam 설정
         self.optim = Adam(lr=config.lr, params=self.model.parameters())
+        # self.optim = optim.NAdam(lr=config.lr, params=self.model.parameters())
 
         self.acc = Accuracy(
-            num_classes=self.config.num_classes, average="macro", task="multiclass"
+            num_classes=self.config.num_classes, average="micro", task="multiclass"
         ).to(device)
         self.precision = Precision(
-            num_classes=self.config.num_classes, average="macro", task="multiclass"
+            num_classes=self.config.num_classes, average="micro", task="multiclass"
         ).to(device)
         self.recall = Recall(
-            num_classes=self.config.num_classes, average="macro", task="multiclass"
+            num_classes=self.config.num_classes, average="micro", task="multiclass"
         ).to(device)
         self.f1 = F1Score(
-            num_classes=self.config.num_classes, average="macro", task="multiclass"
+            num_classes=self.config.num_classes, average="micro", task="multiclass"
         ).to(device)
 
         self.c_mat = ConfusionMatrix(
