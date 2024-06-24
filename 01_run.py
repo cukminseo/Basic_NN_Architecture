@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import argparse
 import torchvision.transforms as transforms
 from torchvision.datasets import ImageFolder
@@ -7,6 +8,7 @@ import os
 import matplotlib.pyplot as plt
 from torchvision.transforms import RandomHorizontalFlip, RandomRotation
 from torch.utils import tensorboard
+from torchvision import models
 
 import util
 import training
@@ -25,14 +27,14 @@ device = "cuda" if torch.cuda.is_available() else "cpu"  # GPU 사용 가능 여
 # argparse
 config = argparse.ArgumentParser()
 config.add_argument("--batch_size", default=4, type=int)
-config.add_argument("--lr", default=0.005, type=float)
+config.add_argument("--lr", default=0.0005, type=float)
 config.add_argument("--gpus", default="0", type=str)
-config.add_argument("--epoch", default=200, type=int)
+config.add_argument("--epoch", default=100, type=int)
 config.add_argument("--earlystop_patience", default=10, type=int)
 config.add_argument("--train_size", default=0.8, type=float)
 config.add_argument("--val_size", default=0.2, type=float)
 config.add_argument("--num_classes", default=3, type=int)
-config.add_argument("--model", default="ResNet", type=str)
+config.add_argument("--model", default="ResNet_P", type=str)
 
 config = config.parse_args()
 
@@ -60,7 +62,7 @@ for fold in range(k_fold):
     # Define data transformations for train, validation, and test sets
     data_transforms = {
         'train': transforms.Compose([
-            transforms.Resize((300, 300)),
+            transforms.Resize((400, 400)),
             transforms.Grayscale(num_output_channels=1),
             RandomHorizontalFlip(p=0.5),
             RandomRotation(30, expand=False, center=None),
@@ -104,6 +106,13 @@ for fold in range(k_fold):
 
     if config.model == 'ResNet':
         model = ResNet(Bottleneck, [3, 4, 23, 3], num_classes=len(class_names))
+    elif config.model == 'ResNet_P':
+        model = models.resnet101(pretrained=True)
+        # 첫 번째 컨볼루션 레이어 수정
+        model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # 마지막 레이어 수정
+        num_ftrs = model.fc.in_features
+        model.fc = nn.Linear(num_ftrs, len(class_names))
     else:
         model = config.model(num_classes=len(class_names))
 
@@ -116,7 +125,7 @@ for fold in range(k_fold):
     checkpoint_score = 0
 
     # tensorboard 로그 기록
-    writer = tensorboard.SummaryWriter(f"./logs/{config.model}_fold{fold + 1}_batch{config.batch_size}_lr{config.lr}(relu,micro)")
+    writer = tensorboard.SummaryWriter(f"./logs/{config.model}_fold{fold + 1}_batch{config.batch_size}_lr{config.lr}(relu,weighted, Momentum0.9, 400)")
 
     # 에포크별 학습 진행
     for epoch in range(config.epoch):

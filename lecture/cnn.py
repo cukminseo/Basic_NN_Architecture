@@ -56,7 +56,7 @@ train_dataset_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, 
 # get validation data(size : BATCH_SIZE)
 validation_dataset_loader = DataLoader(dataset=validation_dataset, batch_size=BATCH_SIZE, shuffle=True)
 # get test data(size : BATCH_SIZE)
-test_dataset_loader = DataLoader(dataset=test_dataset , batch_size=BATCH_SIZE, shuffle=True)
+test_dataset_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # Checking a single piece of data
 train_features, train_labels = next(iter(train_dataset_loader))

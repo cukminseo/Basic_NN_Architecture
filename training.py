@@ -12,32 +12,39 @@ from torchmetrics.classification import (
     F1Score,
 )
 import numpy as np
+import torch.optim.lr_scheduler as lr_scheduler
+
 
 
 class Trainer:
     def __init__(self, config, model, device):
         self.config = config
         self.criterion = nn.CrossEntropyLoss()
+        # self.criterion = nn.MultiMarginLoss()  # 손실함수로 MultiMarginLoss 설정
 
         self.model = model
         self.device = device
         self.model.to(self.device)
 
         # 손실함수로 adam 설정
-        self.optim = Adam(lr=config.lr, params=self.model.parameters())
+        # self.optim = Adam(lr=config.lr, params=self.model.parameters())
+        self.optim = optim.SGD(self.model.parameters(), lr=config.lr, momentum=0.9)
         # self.optim = optim.NAdam(lr=config.lr, params=self.model.parameters())
 
+        # # 학습률 스케줄러 추가
+        # self.scheduler = lr_scheduler.ReduceLROnPlateau(self.optim, mode='min', factor=0.1, patience=5, verbose=True)
+
         self.acc = Accuracy(
-            num_classes=self.config.num_classes, average="micro", task="multiclass"
+            num_classes=self.config.num_classes, average="weighted", task="multiclass"
         ).to(device)
         self.precision = Precision(
-            num_classes=self.config.num_classes, average="micro", task="multiclass"
+            num_classes=self.config.num_classes, average="weighted", task="multiclass"
         ).to(device)
         self.recall = Recall(
-            num_classes=self.config.num_classes, average="micro", task="multiclass"
+            num_classes=self.config.num_classes, average="weighted", task="multiclass"
         ).to(device)
         self.f1 = F1Score(
-            num_classes=self.config.num_classes, average="micro", task="multiclass"
+            num_classes=self.config.num_classes, average="weighted", task="multiclass"
         ).to(device)
 
         self.c_mat = ConfusionMatrix(
@@ -173,6 +180,9 @@ class Trainer:
         avg_precision = np.mean(avg_precision)
         avg_recall = np.mean(avg_recall)
         avg_f1 = np.mean(avg_f1)
+
+        # # 학습률 스케줄러 업데이트
+        # self.scheduler.step(avg_loss)
 
         return {
             "loss": avg_loss,
